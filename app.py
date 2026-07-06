@@ -4,9 +4,20 @@
 
 from fastapi import FastAPI
 from fastapi.responses import HTMLResponse, FileResponse
+from fastapi.middleware.cors import CORSMiddleware
 from pathlib import Path
 
 app = FastAPI(title="ShopDemo")
+
+# ---- Allow the Capacitor app (and website) to call this backend ----
+# Capacitor apps run from origins like capacitor://localhost or https://localhost,
+# which are cross-origin to the Render domain — so we must allow them explicitly.
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["*"],          # demo: allow all. In production, list your exact origins.
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
 
 # ---- Fake "database" of products (later this becomes PostgreSQL) ----
 PRODUCTS = [
