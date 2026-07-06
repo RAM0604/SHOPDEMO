@@ -1,0 +1,194 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>ShopDemo</title>
+
+<!-- ===== CSS inline (no separate file) ===== -->
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body {
+    font-family: -apple-system, "Segoe UI", Roboto, sans-serif;
+    background: #f4f5f7; color: #1a1f28; -webkit-font-smoothing: antialiased;
+  }
+  header {
+    background: #111827; color: #fff; padding: 18px 20px;
+    display: flex; align-items: center; justify-content: space-between;
+    position: sticky; top: 0; z-index: 10;
+  }
+  header h1 { font-size: 20px; font-weight: 800; letter-spacing: -0.02em; }
+  header h1 span { color: #ffc107; }
+  .cart-btn {
+    background: #ffc107; color: #111; border: none; font-weight: 700;
+    padding: 9px 16px; border-radius: 10px; font-size: 14px; cursor: pointer;
+  }
+  .download-btn {
+    background: #22c55e; color: #fff; font-weight: 700; text-decoration: none;
+    padding: 9px 14px; border-radius: 10px; font-size: 14px; white-space: nowrap;
+  }
+  .wrap { max-width: 900px; margin: 0 auto; padding: 24px 16px 60px; }
+  .hero { padding: 8px 4px 22px; }
+  .hero h2 { font-size: 26px; font-weight: 800; letter-spacing: -0.02em; }
+  .hero p { color: #6b7280; margin-top: 4px; }
+
+  .grid {
+    display: grid; gap: 14px;
+    grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
+  }
+  .card {
+    background: #fff; border: 1px solid #e5e7eb; border-radius: 16px;
+    padding: 18px; display: flex; flex-direction: column; gap: 8px;
+  }
+  .card .emoji { font-size: 46px; text-align: center; padding: 12px 0; }
+  .card .name { font-weight: 700; font-size: 15px; }
+  .card .price { color: #059669; font-weight: 800; font-size: 17px; }
+  .card button {
+    margin-top: auto; background: #111827; color: #fff; border: none;
+    padding: 11px; border-radius: 10px; font-weight: 700; cursor: pointer;
+    font-size: 14px; transition: background .15s;
+  }
+  .card button:active { background: #374151; }
+
+  .loading { text-align: center; color: #9ca3af; padding: 40px; }
+
+  /* cart drawer */
+  .overlay {
+    position: fixed; inset: 0; background: rgba(0,0,0,.5);
+    display: none; z-index: 20;
+  }
+  .overlay.open { display: block; }
+  .cart {
+    position: fixed; top: 0; right: -340px; width: 320px; max-width: 85vw;
+    height: 100%; background: #fff; z-index: 30; transition: right .25s;
+    display: flex; flex-direction: column; box-shadow: -8px 0 30px rgba(0,0,0,.15);
+  }
+  .cart.open { right: 0; }
+  .cart-head { padding: 18px 20px; border-bottom: 1px solid #eee; display: flex; justify-content: space-between; align-items: center; }
+  .cart-head h3 { font-size: 18px; }
+  .cart-head .x { background: none; border: none; font-size: 24px; cursor: pointer; color: #6b7280; }
+  .cart-items { flex: 1; overflow-y: auto; padding: 12px 20px; }
+  .cart-row { display: flex; justify-content: space-between; align-items: center; padding: 12px 0; border-bottom: 1px solid #f3f4f6; }
+  .cart-row .ci-name { font-size: 14px; font-weight: 600; }
+  .cart-row .ci-price { color: #059669; font-weight: 700; font-size: 14px; }
+  .cart-empty { color: #9ca3af; text-align: center; padding: 40px 0; }
+  .cart-foot { padding: 18px 20px; border-top: 1px solid #eee; }
+  .cart-total { display: flex; justify-content: space-between; font-weight: 800; font-size: 18px; margin-bottom: 14px; }
+  .checkout { width: 100%; background: #ffc107; color: #111; border: none; padding: 14px; border-radius: 12px; font-weight: 800; font-size: 15px; cursor: pointer; }
+
+  .badge {
+    background: #ef4444; color: #fff; border-radius: 999px; font-size: 11px;
+    padding: 1px 7px; margin-left: 6px; font-weight: 700;
+  }
+</style>
+</head>
+<body>
+
+<header>
+  <h1>Shop<span>Demo</span></h1>
+  <div style="display:flex; gap:10px; align-items:center;">
+    <a class="download-btn" href="/download-app">⬇ Download App</a>
+    <button class="cart-btn" onclick="openCart()">Cart <span class="badge" id="cartCount">0</span></button>
+  </div>
+</header>
+
+<div class="wrap">
+  <div class="hero">
+    <h2>Featured Products</h2>
+    <p>Loaded live from the FastAPI backend.</p>
+  </div>
+  <div class="grid" id="grid">
+    <div class="loading">Loading products…</div>
+  </div>
+</div>
+
+<!-- Cart drawer -->
+<div class="overlay" id="overlay" onclick="closeCart()"></div>
+<div class="cart" id="cart">
+  <div class="cart-head">
+    <h3>Your Cart</h3>
+    <button class="x" onclick="closeCart()">&times;</button>
+  </div>
+  <div class="cart-items" id="cartItems">
+    <div class="cart-empty">Your cart is empty</div>
+  </div>
+  <div class="cart-foot">
+    <div class="cart-total"><span>Total</span><span id="cartTotal">0.00 zł</span></div>
+    <button class="checkout" onclick="checkout()">Checkout</button>
+  </div>
+</div>
+
+<!-- ===== JavaScript inline (no separate file) ===== -->
+<script>
+  // API base — empty means "same domain as this page", so on Render it calls
+  // your Render URL automatically. (The Capacitor APP copy in www/ uses the
+  // full https Render URL instead, since the app has no "current domain".)
+  const API_BASE = "";
+
+  let products = [];
+  let cart = [];
+
+  // Fetch products from the FastAPI backend
+  async function loadProducts() {
+    try {
+      const res = await fetch(API_BASE + "/api/products");
+      const data = await res.json();
+      products = data.products;
+      renderGrid();
+    } catch (e) {
+      document.getElementById("grid").innerHTML =
+        '<div class="loading">Could not reach the backend 😕</div>';
+    }
+  }
+
+  function renderGrid() {
+    document.getElementById("grid").innerHTML = products.map(p => `
+      <div class="card">
+        <div class="emoji">${p.emoji}</div>
+        <div class="name">${p.name}</div>
+        <div class="price">${p.price.toFixed(2)} zł</div>
+        <button onclick="addToCart(${p.id})">Add to Cart</button>
+      </div>
+    `).join("");
+  }
+
+  function addToCart(id) {
+    const p = products.find(x => x.id === id);
+    cart.push(p);
+    updateCart();
+  }
+
+  function updateCart() {
+    document.getElementById("cartCount").textContent = cart.length;
+    const total = cart.reduce((s, p) => s + p.price, 0);
+    document.getElementById("cartTotal").textContent = total.toFixed(2) + " zł";
+
+    const box = document.getElementById("cartItems");
+    if (cart.length === 0) {
+      box.innerHTML = '<div class="cart-empty">Your cart is empty</div>';
+    } else {
+      box.innerHTML = cart.map((p, i) => `
+        <div class="cart-row">
+          <span class="ci-name">${p.emoji} ${p.name}</span>
+          <span class="ci-price">${p.price.toFixed(2)} zł</span>
+        </div>
+      `).join("");
+    }
+  }
+
+  function openCart() { document.getElementById("cart").classList.add("open"); document.getElementById("overlay").classList.add("open"); }
+  function closeCart() { document.getElementById("cart").classList.remove("open"); document.getElementById("overlay").classList.remove("open"); }
+
+  function checkout() {
+    if (cart.length === 0) { alert("Your cart is empty!"); return; }
+    const total = cart.reduce((s, p) => s + p.price, 0);
+    alert("Order placed! Total: " + total.toFixed(2) + " zł\n(This is where the payment gateway will go.)");
+    cart = [];
+    updateCart();
+    closeCart();
+  }
+
+  loadProducts();
+</script>
+</body>
+</html>
